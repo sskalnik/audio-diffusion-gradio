@@ -15,7 +15,8 @@ from torch.nn.parameter import Parameter
 import importlib
 import random
 
-from stable_audio_tools.data.dataset import create_dataloader_from_configs_and_args
+
+from stable_audio_tools.data.dataset import create_dataloader_from_config
 from stable_audio_tools.inference.generation import (
     generate_diffusion_cond,
     generate_diffusion_uncond,
@@ -262,6 +263,17 @@ class stable_audio_interface:
 
         return input_audio
 
+    def create_send_to_input_single(self, input_component):
+        send_to_input_button = gr.Button("Send to init audio", variant="secondary")
+        # remake send_to as lambda to prevent circular reference
+        send_to_input_button.click(
+            fn=lambda input_component: input_component,
+            inputs=input_component,
+            outputs=[self.init_audio_input],
+            api_name=False,
+        )
+        return send_to_input_button
+
     def create_send_to_input_list(self, input_components):
         with gr.Row():
             with gr.Group():
@@ -346,7 +358,7 @@ class stable_audio_interface:
                 if hasattr(checked_module, "install_aliases") and module in list(
                     checked_module.install_aliases.keys()
                 ):
-                    checked = checked_module.aliases[module]
+                    checked = checked_module.install_aliases[module]
                 installed = is_installed(checked)
                 if not installed:
                     install_command = f"install {module}"
@@ -452,7 +464,7 @@ class stable_audio_interface:
         tame=False,
         steps=250,
         seed=-1,
-        sampler_type="dpmpp-2m-sde",
+        sampler_type="dpmpp-3m-sde",
         sigma_min=0.03,
         sigma_max=50,
         sample_size=65536,
@@ -796,7 +808,9 @@ class stable_audio_interface:
                             )
                             # reset sample_size button
                             with gr.Group():
-                                reset_sample_size_button = gr.Button("🔃 Reset", scale=1)
+                                reset_sample_size_button = gr.Button(
+                                    "🔃 Reset", scale=1
+                                )
                                 reset_sample_size_button.click(
                                     fn=self.reset_sample_size,
                                     outputs=[self.sample_size_slider],
@@ -824,6 +838,7 @@ class stable_audio_interface:
                             sampler_type_dropdown = gr.Dropdown(
                                 [
                                     "dpmpp-2m-sde",
+                                    "dpmpp-3m-sde",
                                     "k-heun",
                                     "k-lms",
                                     "k-dpmpp-2s-ancestral",
@@ -831,7 +846,7 @@ class stable_audio_interface:
                                     "k-dpm-fast",
                                 ],
                                 label="Sampler type",
-                                value="dpmpp-2m-sde",
+                                value="dpmpp-3m-sde",
                                 scale=6,
                             )
 
@@ -1319,7 +1334,11 @@ class stable_audio_interface:
             "Precision set to float16." if self.fp16 else "Precision set to float32."
         )
         if self.current_loaded_model:
-            self.current_loaded_model.half() if self.fp16 else self.current_loaded_model.float()
+            (
+                self.current_loaded_model.half()
+                if self.fp16
+                else self.current_loaded_model.float()
+            )
         gr.Info(infostring)
         return
 
@@ -1806,8 +1825,11 @@ class stable_audio_interface:
             with open(args.dataset_config) as f:
                 dataset_config = json.load(f)
 
-            train_dl = create_dataloader_from_configs_and_args(
-                model_config, args, dataset_config
+            train_dl = create_dataloader_from_config(
+                dataset_config=dataset_config,
+                batch_size=args.batch_size,
+                sample_size=model_config.get("sample_size"),
+                sample_rate=model_config.get("sample_rate"),
             )
 
             model = create_model_from_config(model_config)
@@ -1939,9 +1961,11 @@ class stable_audio_interface:
             return_data = return_data + [
                 self.current_device,
                 self.fp16,
-                self.current_set_model_path
-                if self.current_loaded_model_path
-                else "None",
+                (
+                    self.current_set_model_path
+                    if self.current_loaded_model_path
+                    else "None"
+                ),
                 self.current_set_model_config if not self.embedded_config else None,
                 self.current_set_pretransform_path,
             ]  # add global settings
@@ -1956,9 +1980,11 @@ class stable_audio_interface:
                 gr.Box(visible=False),  # default autoencoder
                 gr.Box(visible=True),  # default blank
                 gr.Tabs(
-                    selected="model_settings"
-                    if "settings" not in self.hidden
-                    else "model_process"
+                    selected=(
+                        "model_settings"
+                        if "settings" not in self.hidden
+                        else "model_process"
+                    )
                 ),  # open settings
                 gr.Accordion(
                     label="⌛ Timing Controls", visible=False
