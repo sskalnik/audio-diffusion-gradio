@@ -1,5 +1,7 @@
 # audio-diffusion-gradio (alpha)
 
+# Notice: Im a touring artist and sadly enough do not have too much dev time currently, any help is appreciated!!! :) <3
+
 ## ⚠️ This software is a WIP and alot of functionality could have bugs. ⚠️
 
 ![adg](https://www.dropbox.com/scl/fi/6l0j8nsbitbagbzcetd6v/audio-diffusion-gradio.png?rlkey=6zzx3mjxq4gemj1dgbjkvjsdw&raw=1)
